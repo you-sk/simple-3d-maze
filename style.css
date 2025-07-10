@@ -6,7 +6,15 @@ body {
 
 h1 {
     text-align: center;
-    margin: 20px 0;
+    margin: 10px 0;
+}
+
+#stats-container {
+    display: flex;
+    justify-content: center;
+    gap: 50px;
+    margin-bottom: 10px;
+    font-size: 1.2em;
 }
 
 #game-container {

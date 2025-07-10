@@ -2,71 +2,90 @@ const MAZE_WIDTH = 31;
 const MAZE_HEIGHT = 21;
 const WALL_HEIGHT = 5;
 const CELL_SIZE = 10;
+const NUM_GEMS = 3;
 
 let scene, camera, renderer;
 let maze = [];
 let discoveredMaze = [];
+let gems = [];
+let pointLight;
 
 let playerX = 1;
 let playerY = 1;
-let playerRotation = 0; // 0: North, 1: East, 2: South, 3: West
+let playerRotation = 0;
+
+let collectedGems = 0;
+let startTime, timerInterval;
 
 let isMoving = false;
 
 const mapCanvas = document.getElementById('map-2d');
 const mapCtx = mapCanvas.getContext('2d');
+const gemCounter = document.getElementById('gem-counter');
+const timerDisplay = document.getElementById('timer');
 
 function init() {
-    // 3D Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
 
-    // Camera (Player)
     camera = new THREE.PerspectiveCamera(75, (window.innerWidth * 0.6) / 600, 0.1, 1000);
-    updateCameraPosition();
 
-    // Renderer
-    renderer = new THREE.WebGLRenderer();
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth * 0.6, 600);
     document.getElementById('view-3d').appendChild(renderer.domElement);
 
-    // Floor
+    document.getElementById('restart-button').addEventListener('click', restartGame);
+    document.addEventListener('keydown', handleKeyDown);
+
+    startGame();
+    animate();
+}
+
+function startGame() {
+    playerX = 1;
+    playerY = 1;
+    playerRotation = 0;
+    collectedGems = 0;
+    updateGemCounter();
+
+    while(scene.children.length > 0){ 
+        scene.remove(scene.children[0]); 
+    }
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    pointLight = new THREE.PointLight(0xffffff, 0.8, 50);
+    scene.add(pointLight);
+
     const floorGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE, MAZE_HEIGHT * CELL_SIZE);
-    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.8 });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
     floor.position.set((MAZE_WIDTH / 2) * CELL_SIZE, 0, (MAZE_HEIGHT / 2) * CELL_SIZE);
     scene.add(floor);
 
-    // Maze Generation
     generateMaze();
-
-    // Draw Maze
     drawMaze();
+    placeGems();
 
-    // Goal
     const goalGeometry = new THREE.BoxGeometry(CELL_SIZE / 2, CELL_SIZE / 2, CELL_SIZE / 2);
     const goalMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
     const goal = new THREE.Mesh(goalGeometry, goalMaterial);
     goal.position.set((MAZE_WIDTH - 2) * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, (MAZE_HEIGHT - 2) * CELL_SIZE + CELL_SIZE / 2);
     scene.add(goal);
 
-    // 2D Map
     init2DMap();
-
-    // Event Listeners
-    document.addEventListener('keydown', handleKeyDown);
-    document.getElementById('restart-button').addEventListener('click', restartGame);
-
-    // Game Loop
-    animate();
+    updateCameraPosition();
+    startTimer();
 }
 
 function generateMaze() {
     for (let y = 0; y < MAZE_HEIGHT; y++) {
         maze[y] = [];
+        discoveredMaze[y] = [];
         for (let x = 0; x < MAZE_WIDTH; x++) {
             maze[y][x] = 1;
+            discoveredMaze[y][x] = -1;
         }
     }
     const stack = [];
@@ -90,20 +109,23 @@ function generateMaze() {
             stack.pop();
         }
     }
-    for (let y = 0; y < MAZE_HEIGHT; y++) {
-        discoveredMaze[y] = [];
-        for (let x = 0; x < MAZE_WIDTH; x++) {
-            discoveredMaze[y][x] = -1;
+
+    // Add loops to the maze
+    const loops = Math.floor((MAZE_WIDTH * MAZE_HEIGHT) / 20);
+    for (let i = 0; i < loops; i++) {
+        const x = Math.floor(Math.random() * (MAZE_WIDTH - 2)) + 1;
+        const y = Math.floor(Math.random() * (MAZE_HEIGHT - 2)) + 1;
+        if (maze[y][x] === 1) {
+            maze[y][x] = 0;
         }
     }
 }
 
 function drawMaze() {
     const wallGeometry = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
-    const wallMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
-
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.9 });
     const edgesGeometry = new THREE.EdgesGeometry(wallGeometry);
-    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x333333 });
 
     for (let y = 0; y < MAZE_HEIGHT; y++) {
         for (let x = 0; x < MAZE_WIDTH; x++) {
@@ -111,7 +133,6 @@ function drawMaze() {
                 const wall = new THREE.Mesh(wallGeometry, wallMaterial);
                 wall.position.set(x * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, y * CELL_SIZE + CELL_SIZE / 2);
                 scene.add(wall);
-
                 const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
                 edges.position.copy(wall.position);
                 scene.add(edges);
@@ -120,15 +141,45 @@ function drawMaze() {
     }
 }
 
+function placeGems() {
+    gems = [];
+    const gemGeometry = new THREE.IcosahedronGeometry(CELL_SIZE / 3, 0);
+    const gemMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.8,
+        roughness: 0.1,
+        metalness: 0.2,
+        transmission: 0.9,
+        clearcoat: 1.0
+    });
+
+    for (let i = 0; i < NUM_GEMS; i++) {
+        let x, y;
+        do {
+            x = Math.floor(Math.random() * (MAZE_WIDTH - 2)) + 1;
+            y = Math.floor(Math.random() * (MAZE_HEIGHT - 2)) + 1;
+        } while (maze[y][x] !== 0 || (x === 1 && y === 1) || (x === MAZE_WIDTH - 2 && y === MAZE_HEIGHT - 2));
+        
+        const gem = new THREE.Mesh(gemGeometry, gemMaterial);
+        gem.position.set(x * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, y * CELL_SIZE + CELL_SIZE / 2);
+        gem.userData = { x, y };
+        gems.push(gem);
+        scene.add(gem);
+    }
+}
+
 function init2DMap() {
     mapCanvas.width = mapCanvas.offsetWidth;
     mapCanvas.height = mapCanvas.offsetHeight;
-    mapCtx.fillStyle = 'black';
-    mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+    update2DMap();
 }
 
 function animate() {
     requestAnimationFrame(animate);
+    gems.forEach(gem => {
+        gem.rotation.y += 0.02;
+    });
     renderer.render(scene, camera);
 }
 
@@ -141,25 +192,28 @@ function handleKeyDown(e) {
 
     switch (e.key) {
         case 'w':
+        case 'ArrowUp':
             if (playerRotation === 0) targetY--;
             if (playerRotation === 1) targetX++;
             if (playerRotation === 2) targetY++;
             if (playerRotation === 3) targetX--;
             break;
         case 's':
+        case 'ArrowDown':
             if (playerRotation === 0) targetY++;
             if (playerRotation === 1) targetX--;
             if (playerRotation === 2) targetY--;
             if (playerRotation === 3) targetX++;
             break;
         case 'a':
+        case 'ArrowLeft':
             targetRotation = (playerRotation + 3) % 4;
             break;
         case 'd':
+        case 'ArrowRight':
             targetRotation = (playerRotation + 1) % 4;
             break;
-        default:
-            return;
+        default: return;
     }
 
     if (maze[targetY] && maze[targetY][targetX] === 0) {
@@ -179,14 +233,13 @@ function handleKeyDown(e) {
     function moveAnimation(timestamp) {
         if (!startTime) startTime = timestamp;
         const progress = Math.min((timestamp - startTime) / 200, 1);
-
         camera.position.lerpVectors(startPosition, endPosition, progress);
         camera.quaternion.slerpQuaternions(startQuaternion, endQuaternion, progress);
-
         if (progress < 1) {
             requestAnimationFrame(moveAnimation);
         } else {
             isMoving = false;
+            checkGemCollection();
             update2DMap();
             checkGoal();
         }
@@ -197,33 +250,22 @@ function handleKeyDown(e) {
 function updateCameraPosition() {
     camera.position.set(playerX * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, playerY * CELL_SIZE + CELL_SIZE / 2);
     camera.quaternion.setFromEuler(new THREE.Euler(0, -playerRotation * Math.PI / 2, 0, 'YXZ'));
+    pointLight.position.copy(camera.position);
 }
 
 function update2DMap() {
-    if (discoveredMaze[playerY][playerX] === -1) {
-        discoveredMaze[playerY][playerX] = maze[playerY][playerX];
-    }
-    for (let y = -1; y <= 1; y++) {
-        for (let x = -1; x <= 1; x++) {
-            const checkX = playerX + x;
-            const checkY = playerY + y;
-            if (checkX >= 0 && checkX < MAZE_WIDTH && checkY >= 0 && checkY < MAZE_HEIGHT) {
-                if (discoveredMaze[checkY][checkX] === -1) {
-                    discoveredMaze[checkY][checkX] = maze[checkY][checkX];
-                }
-            }
-        }
-    }
-    draw2DMap();
-}
-
-function draw2DMap() {
     const cellWidth = mapCanvas.width / MAZE_WIDTH;
     const cellHeight = mapCanvas.height / MAZE_HEIGHT;
     mapCtx.fillStyle = 'black';
     mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+
     for (let y = 0; y < MAZE_HEIGHT; y++) {
         for (let x = 0; x < MAZE_WIDTH; x++) {
+            if (discoveredMaze[y][x] === -1) {
+                 if (Math.abs(playerX - x) <= 1 && Math.abs(playerY - y) <= 1) {
+                    discoveredMaze[y][x] = maze[y][x];
+                }
+            }
             if (discoveredMaze[y][x] === 0) {
                 mapCtx.fillStyle = 'white';
                 mapCtx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
@@ -235,6 +277,15 @@ function draw2DMap() {
             }
         }
     }
+
+    mapCtx.font = `bold ${cellHeight * 0.8}px sans-serif`;
+    mapCtx.textAlign = 'center';
+    mapCtx.textBaseline = 'middle';
+    mapCtx.fillStyle = '#33aaff';
+    mapCtx.fillText('S', 1.5 * cellWidth, 1.5 * cellHeight);
+    mapCtx.fillStyle = '#ff33aa';
+    mapCtx.fillText('G', (MAZE_WIDTH - 1.5) * cellWidth, (MAZE_HEIGHT - 1.5) * cellHeight);
+
     mapCtx.fillStyle = 'red';
     mapCtx.save();
     mapCtx.translate(playerX * cellWidth + cellWidth / 2, playerY * cellHeight + cellHeight / 2);
@@ -248,35 +299,52 @@ function draw2DMap() {
     mapCtx.restore();
 }
 
+function checkGemCollection() {
+    gems.forEach((gem, index) => {
+        if (playerX === gem.userData.x && playerY === gem.userData.y) {
+            scene.remove(gem);
+            gems.splice(index, 1);
+            collectedGems++;
+            updateGemCounter();
+        }
+    });
+}
+
+function updateGemCounter() {
+    gemCounter.textContent = `Gems: ${collectedGems}/${NUM_GEMS}`;
+}
+
 function checkGoal() {
     if (playerX === MAZE_WIDTH - 2 && playerY === MAZE_HEIGHT - 2) {
-        document.getElementById('goal-modal').style.display = 'block';
+        if (collectedGems === NUM_GEMS) {
+            stopTimer();
+            const time = timerDisplay.textContent;
+            document.getElementById('goal-modal').querySelector('h2').textContent = `Goal!\nTime: ${time}`;
+            document.getElementById('goal-modal').style.display = 'block';
+        } else {
+            // Maybe show a message that not all gems are collected
+        }
     }
 }
 
 function restartGame() {
     document.getElementById('goal-modal').style.display = 'none';
-    playerX = 1;
-    playerY = 1;
-    playerRotation = 0;
-    updateCameraPosition();
-    generateMaze();
-    while(scene.children.length > 0){ 
-        scene.remove(scene.children[0]); 
-    }
-    drawMaze();
-    const goalGeometry = new THREE.BoxGeometry(CELL_SIZE / 2, CELL_SIZE / 2, CELL_SIZE / 2);
-    const goalMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    const goal = new THREE.Mesh(goalGeometry, goalMaterial);
-    goal.position.set((MAZE_WIDTH - 2) * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, (MAZE_HEIGHT - 2) * CELL_SIZE + CELL_SIZE / 2);
-    scene.add(goal);
-    const floorGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE, MAZE_HEIGHT * CELL_SIZE);
-    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = Math.PI / 2;
-    floor.position.set((MAZE_WIDTH / 2) * CELL_SIZE, 0, (MAZE_HEIGHT / 2) * CELL_SIZE);
-    scene.add(floor);
-    init2DMap();
+    startGame();
+}
+
+function startTimer() {
+    startTime = Date.now();
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        const elapsedTime = Date.now() - startTime;
+        const minutes = Math.floor(elapsedTime / 60000);
+        const seconds = Math.floor((elapsedTime % 60000) / 1000);
+        timerDisplay.textContent = `Time: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }, 1000);
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
 }
 
 init();
