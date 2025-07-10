@@ -12,9 +12,14 @@ h1 {
 #stats-container {
     display: flex;
     justify-content: center;
+    align-items: center;
     gap: 50px;
     margin-bottom: 10px;
     font-size: 1.2em;
+}
+
+#timer-container {
+    text-align: center;
 }
 
 #game-container {

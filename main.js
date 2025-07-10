@@ -15,7 +15,8 @@ let playerY = 1;
 let playerRotation = 0;
 
 let collectedGems = 0;
-let startTime, timerInterval;
+let startTime, elapsedTime, timerInterval;
+let bestTime = localStorage.getItem('bestTime') || Infinity;
 
 let isMoving = false;
 
@@ -23,10 +24,11 @@ const mapCanvas = document.getElementById('map-2d');
 const mapCtx = mapCanvas.getContext('2d');
 const gemCounter = document.getElementById('gem-counter');
 const timerDisplay = document.getElementById('timer');
+const bestTimeDisplay = document.getElementById('best-time');
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb);
+    scene.background = new THREE.Color(0x111111);
 
     camera = new THREE.PerspectiveCamera(75, (window.innerWidth * 0.6) / 600, 0.1, 1000);
 
@@ -37,6 +39,7 @@ function init() {
     document.getElementById('restart-button').addEventListener('click', restartGame);
     document.addEventListener('keydown', handleKeyDown);
 
+    updateBestTimeDisplay();
     startGame();
     animate();
 }
@@ -52,17 +55,24 @@ function startGame() {
         scene.remove(scene.children[0]); 
     }
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
-    pointLight = new THREE.PointLight(0xffffff, 0.8, 50);
+    pointLight = new THREE.PointLight(0xffffff, 1, 50);
     scene.add(pointLight);
 
     const floorGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE, MAZE_HEIGHT * CELL_SIZE);
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.8 });
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8 });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
     floor.position.set((MAZE_WIDTH / 2) * CELL_SIZE, 0, (MAZE_HEIGHT / 2) * CELL_SIZE);
     scene.add(floor);
+
+    const ceilingGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE, MAZE_HEIGHT * CELL_SIZE);
+    const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
+    const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+    ceiling.rotation.x = -Math.PI / 2;
+    ceiling.position.set((MAZE_WIDTH / 2) * CELL_SIZE, WALL_HEIGHT, (MAZE_HEIGHT / 2) * CELL_SIZE);
+    scene.add(ceiling);
 
     generateMaze();
     drawMaze();
@@ -109,9 +119,7 @@ function generateMaze() {
             stack.pop();
         }
     }
-
-    // Add loops to the maze
-    const loops = Math.floor((MAZE_WIDTH * MAZE_HEIGHT) / 20);
+    const loops = Math.floor((MAZE_WIDTH * MAZE_HEIGHT) / 15);
     for (let i = 0; i < loops; i++) {
         const x = Math.floor(Math.random() * (MAZE_WIDTH - 2)) + 1;
         const y = Math.floor(Math.random() * (MAZE_HEIGHT - 2)) + 1;
@@ -123,9 +131,9 @@ function generateMaze() {
 
 function drawMaze() {
     const wallGeometry = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.9 });
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
     const edgesGeometry = new THREE.EdgesGeometry(wallGeometry);
-    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x333333 });
+    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x222222 });
 
     for (let y = 0; y < MAZE_HEIGHT; y++) {
         for (let x = 0; x < MAZE_WIDTH; x++) {
@@ -145,12 +153,12 @@ function placeGems() {
     gems = [];
     const gemGeometry = new THREE.IcosahedronGeometry(CELL_SIZE / 3, 0);
     const gemMaterial = new THREE.MeshPhysicalMaterial({
-        color: 0x00ffff,
+        color: 0xff0000, // Ruby red
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.9,
         roughness: 0.1,
-        metalness: 0.2,
-        transmission: 0.9,
+        metalness: 0.3,
+        transmission: 0.8,
         clearcoat: 1.0
     });
 
@@ -191,26 +199,22 @@ function handleKeyDown(e) {
     let targetRotation = playerRotation;
 
     switch (e.key) {
-        case 'w':
-        case 'ArrowUp':
+        case 'w': case 'ArrowUp':
             if (playerRotation === 0) targetY--;
             if (playerRotation === 1) targetX++;
             if (playerRotation === 2) targetY++;
             if (playerRotation === 3) targetX--;
             break;
-        case 's':
-        case 'ArrowDown':
+        case 's': case 'ArrowDown':
             if (playerRotation === 0) targetY++;
             if (playerRotation === 1) targetX--;
             if (playerRotation === 2) targetY--;
             if (playerRotation === 3) targetX++;
             break;
-        case 'a':
-        case 'ArrowLeft':
+        case 'a': case 'ArrowLeft':
             targetRotation = (playerRotation + 3) % 4;
             break;
-        case 'd':
-        case 'ArrowRight':
+        case 'd': case 'ArrowRight':
             targetRotation = (playerRotation + 1) % 4;
             break;
         default: return;
@@ -259,13 +263,26 @@ function update2DMap() {
     mapCtx.fillStyle = 'black';
     mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
 
-    for (let y = 0; y < MAZE_HEIGHT; y++) {
-        for (let x = 0; x < MAZE_WIDTH; x++) {
-            if (discoveredMaze[y][x] === -1) {
-                 if (Math.abs(playerX - x) <= 1 && Math.abs(playerY - y) <= 1) {
-                    discoveredMaze[y][x] = maze[y][x];
+    // Discover current cell
+    if (discoveredMaze[playerY][playerX] === -1) {
+        discoveredMaze[playerY][playerX] = maze[playerY][playerX];
+    }
+
+    // Discover adjacent cells
+    for (let y = -1; y <= 1; y++) {
+        for (let x = -1; x <= 1; x++) {
+            const checkX = playerX + x;
+            const checkY = playerY + y;
+            if (checkX >= 0 && checkX < MAZE_WIDTH && checkY >= 0 && checkY < MAZE_HEIGHT) {
+                if (discoveredMaze[checkY][checkX] === -1) {
+                    discoveredMaze[checkY][checkX] = maze[checkY][checkX];
                 }
             }
+        }
+    }
+
+    for (let y = 0; y < MAZE_HEIGHT; y++) {
+        for (let x = 0; x < MAZE_WIDTH; x++) {
             if (discoveredMaze[y][x] === 0) {
                 mapCtx.fillStyle = 'white';
                 mapCtx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
@@ -278,7 +295,7 @@ function update2DMap() {
         }
     }
 
-    mapCtx.font = `bold ${cellHeight * 0.8}px sans-serif`;
+    mapCtx.font = `bold ${cellHeight * 1.2}px sans-serif`;
     mapCtx.textAlign = 'center';
     mapCtx.textBaseline = 'middle';
     mapCtx.fillStyle = '#33aaff';
@@ -318,13 +335,26 @@ function checkGoal() {
     if (playerX === MAZE_WIDTH - 2 && playerY === MAZE_HEIGHT - 2) {
         if (collectedGems === NUM_GEMS) {
             stopTimer();
-            const time = timerDisplay.textContent;
-            document.getElementById('goal-modal').querySelector('h2').textContent = `Goal!\nTime: ${time}`;
-            document.getElementById('goal-modal').style.display = 'block';
-        } else {
-            // Maybe show a message that not all gems are collected
+            const newBestTime = elapsedTime < bestTime;
+            if (newBestTime) {
+                bestTime = elapsedTime;
+                localStorage.setItem('bestTime', bestTime);
+                updateBestTimeDisplay();
+            }
+            showGoalModal(newBestTime);
         }
     }
+}
+
+function showGoalModal(isNewRecord) {
+    const modalTitle = document.getElementById('modal-title');
+    const modalTime = document.getElementById('modal-time');
+    const modalBestTime = document.getElementById('modal-best-time');
+
+    modalTitle.textContent = isNewRecord ? "New Record!" : "Goal!";
+    modalTime.textContent = `Time: ${formatTime(elapsedTime)}`;
+    modalBestTime.textContent = `Best: ${formatTime(bestTime)}`;
+    document.getElementById('goal-modal').style.display = 'block';
 }
 
 function restartGame() {
@@ -336,15 +366,24 @@ function startTimer() {
     startTime = Date.now();
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
-        const elapsedTime = Date.now() - startTime;
-        const minutes = Math.floor(elapsedTime / 60000);
-        const seconds = Math.floor((elapsedTime % 60000) / 1000);
-        timerDisplay.textContent = `Time: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        elapsedTime = Date.now() - startTime;
+        timerDisplay.textContent = `Time: ${formatTime(elapsedTime)}`;
     }, 1000);
 }
 
 function stopTimer() {
     clearInterval(timerInterval);
+}
+
+function formatTime(ms) {
+    if (ms === Infinity) return "--:--";
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function updateBestTimeDisplay() {
+    bestTimeDisplay.textContent = `Best: ${formatTime(bestTime)}`;
 }
 
 init();

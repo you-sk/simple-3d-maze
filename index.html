@@ -3,14 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D迷路ゲーム</title>
+    <title>Gem Runner 3D</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>3D迷路ゲーム</h1>
+    <h1>Gem Runner 3D</h1>
     <div id="stats-container">
         <div id="gem-counter">Gems: 0/3</div>
-        <div id="timer">Time: 00:00</div>
+        <div id="timer-container">
+            <div id="timer">Time: 00:00</div>
+            <div id="best-time">Best: --:--</div>
+        </div>
     </div>
     <div id="game-container">
         <div id="view-3d"></div>
@@ -19,7 +22,9 @@
 
     <div id="goal-modal" class="modal">
         <div class="modal-content">
-            <h2>Goal!</h2>
+            <h2 id="modal-title">Goal!</h2>
+            <p id="modal-time"></p>
+            <p id="modal-best-time"></p>
             <button id="restart-button">Restart</button>
         </div>
     </div>
