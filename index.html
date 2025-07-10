@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D迷路ゲーム</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>3D迷路ゲーム</h1>
+    <div id="game-container">
+        <div id="view-3d"></div>
+        <canvas id="map-2d"></canvas>
+    </div>
+
+    <div id="goal-modal" class="modal">
+        <div class="modal-content">
+            <h2>Goal!</h2>
+            <button id="restart-button">Restart</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
