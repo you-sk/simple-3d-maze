@@ -1,35 +1,35 @@
 # Gem Runner 3D
 
-## Overview
-Gem Runner 3D is a simple 3D maze game where players navigate a procedurally generated maze, collect gems, and reach the goal as fast as possible. A 2D map assists in navigation, revealing discovered areas.
+## 概要
+Gem Runner 3Dは、プレイヤーがプロシージャル生成された3D迷路を探索し、宝石を集め、できるだけ早くゴールを目指すシンプルな3D迷路ゲームです。2Dマップがナビゲーションを補助し、探索済みのエリアを表示します。
 
-## Features
--   **Procedurally Generated Mazes:** Each game offers a new maze experience.
--   **3D First-Person View:** Immerse yourself in the maze with a dynamic camera.
--   **Gem Collection:** Collect all gems scattered throughout the maze to unlock the goal.
--   **Timer & Best Time:** Track your performance and aim for new records.
--   **2D Minimap:** A real-time 2D map helps you navigate, revealing explored paths.
+## 特徴
+-   **プロシージャル生成される迷路:** プレイするたびに新しい迷路体験ができます。
+-   **3D一人称視点:** ダイナミックなカメラで迷路に没入できます。
+-   **宝石収集:** 迷路に散らばるすべての宝石を集めてゴールをアンロックします。
+-   **タイマーとベストタイム:** プレイ時間を記録し、自己ベスト更新を目指せます。
+-   **2Dミニマップ:** リアルタイムの2Dマップが探索済みの経路を表示し、ナビゲーションを助けます。
 
-## How to Play
-1.  Open `index.html` in your web browser.
-2.  Use the **W, A, S, D** keys or **Arrow Keys** to move and rotate:
-    -   **W / Up Arrow:** Move Forward
-    -   **S / Down Arrow:** Move Backward
-    -   **A / Left Arrow:** Turn Left
-    -   **D / Right Arrow:** Turn Right
-3.  Collect all 3 gems.
-4.  Reach the green goal cube to finish the game.
+## 遊び方
+1.  ウェブブラウザで `index.html` を開きます。
+2.  **W、A、S、D** キーまたは **矢印キー** を使って移動および回転します。
+    -   **W / 上矢印:** 前進
+    -   **S / 下矢印:** 後退
+    -   **A / 左矢印:** 左に回転
+    -   **D / 右矢印:** 右に回転
+3.  3つの宝石をすべて集めます。
+4.  緑色のゴールキューブに到達するとゲームクリアです。
 
-## Technologies Used
+## 使用技術
 -   HTML5
 -   CSS3
 -   JavaScript (ES6+)
--   [Three.js](https://threejs.org/) (r128) - For 3D rendering
+-   [Three.js](https://threejs.org/) (r128) - 3Dレンダリング用
 
-## Installation & Setup
-1.  Clone this repository or download the source code.
-2.  Navigate to the project directory.
-3.  Open `index.html` in your preferred web browser. No local server is required to run the game.
+## インストールとセットアップ
+1.  このリポジトリをクローンするか、ソースコードをダウンロードします。
+2.  プロジェクトディレクトリに移動します。
+3.  お好みのウェブブラウザで `index.html` を開きます。ゲームを実行するためにローカルサーバーは必要ありません。
 
-## License
-This project is licensed under the MIT License - see the [LICENSE](#license) file for details.
+## ライセンス
+このプロジェクトはMITライセンスの下で公開されています。詳細は[LICENSE](#license)ファイルをご覧ください。
