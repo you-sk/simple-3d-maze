@@ -24,11 +24,11 @@ const mapCanvas = document.getElementById('map-2d');
 const mapCtx = mapCanvas.getContext('2d');
 const gemCounter = document.getElementById('gem-counter');
 const timerDisplay = document.getElementById('timer');
-const bestTimeDisplay = document.getElementById('best-time');
+const bestTimeDisplay = document.getElementById('best-time'); // Corrected line
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111111);
+    scene.background = new THREE.Color(0x87CEEB); // Sky blue background
 
     camera = new THREE.PerspectiveCamera(75, (window.innerWidth * 0.6) / 600, 0.1, 1000);
 
@@ -51,28 +51,23 @@ function startGame() {
     collectedGems = 0;
     updateGemCounter();
 
-    while(scene.children.length > 0){ 
-        scene.remove(scene.children[0]); 
+    while(scene.children.length > 0){
+        scene.remove(scene.children[0]);
     }
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Original intensity
     scene.add(ambientLight);
-    pointLight = new THREE.PointLight(0xffffff, 1, 50);
+    pointLight = new THREE.PointLight(0xffffff, 1, 50); // Original intensity
     scene.add(pointLight);
 
     const floorGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE, MAZE_HEIGHT * CELL_SIZE);
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8 });
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xAAAAAA, roughness: 0.8, side: THREE.DoubleSide }); // Grey floor, StandardMaterial
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
     floor.position.set((MAZE_WIDTH / 2) * CELL_SIZE, 0, (MAZE_HEIGHT / 2) * CELL_SIZE);
     scene.add(floor);
 
-    const ceilingGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE, MAZE_HEIGHT * CELL_SIZE);
-    const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
-    const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-    ceiling.rotation.x = -Math.PI / 2;
-    ceiling.position.set((MAZE_WIDTH / 2) * CELL_SIZE, WALL_HEIGHT, (MAZE_HEIGHT / 2) * CELL_SIZE);
-    scene.add(ceiling);
+    // Ceiling object removed as per user's request to use background color for sky
 
     generateMaze();
     drawMaze();
@@ -168,7 +163,7 @@ function placeGems() {
             x = Math.floor(Math.random() * (MAZE_WIDTH - 2)) + 1;
             y = Math.floor(Math.random() * (MAZE_HEIGHT - 2)) + 1;
         } while (maze[y][x] !== 0 || (x === 1 && y === 1) || (x === MAZE_WIDTH - 2 && y === MAZE_HEIGHT - 2));
-        
+
         const gem = new THREE.Mesh(gemGeometry, gemMaterial);
         gem.position.set(x * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, y * CELL_SIZE + CELL_SIZE / 2);
         gem.userData = { x, y };
@@ -226,7 +221,7 @@ function handleKeyDown(e) {
     }
 
     playerRotation = targetRotation;
-    
+
     isMoving = true;
     const startPosition = camera.position.clone();
     const endPosition = new THREE.Vector3(playerX * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, playerY * CELL_SIZE + CELL_SIZE / 2);
