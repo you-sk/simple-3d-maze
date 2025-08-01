@@ -17,7 +17,24 @@
     </div>
     <div id="game-container">
         <div id="view-3d"></div>
-        <canvas id="map-2d"></canvas>
+        <div id="map-container">
+            <div id="map-header">MAP</div>
+            <canvas id="map-2d"></canvas>
+            <div id="map-stats">
+                <div class="stat-row">
+                    <span class="stat-label">Position:</span>
+                    <span class="stat-value" id="position">X: 1, Y: 1</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Explored:</span>
+                    <span class="stat-value" id="explored">0%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Distance to Goal:</span>
+                    <span class="stat-value" id="distance">-</span>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="goal-modal" class="modal">

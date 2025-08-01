@@ -19,6 +19,7 @@ let startTime, elapsedTime, timerInterval;
 let bestTime = localStorage.getItem('bestTime') || Infinity;
 
 let isMoving = false;
+let totalExploredCells = 0;
 
 const mapCanvas = document.getElementById('map-2d');
 const mapCtx = mapCanvas.getContext('2d');
@@ -173,8 +174,19 @@ function placeGems() {
 }
 
 function init2DMap() {
+    const mapContainer = mapCanvas.parentElement;
+    const computedStyle = window.getComputedStyle(mapContainer);
+    const containerHeight = mapContainer.clientHeight - 
+                          parseInt(computedStyle.paddingTop) - 
+                          parseInt(computedStyle.paddingBottom);
+    
+    // Calculate available height for canvas
+    const headerHeight = document.getElementById('map-header').offsetHeight;
+    const statsHeight = document.getElementById('map-stats').offsetHeight;
+    const availableHeight = containerHeight - headerHeight - statsHeight;
+    
     mapCanvas.width = mapCanvas.offsetWidth;
-    mapCanvas.height = mapCanvas.offsetHeight;
+    mapCanvas.height = availableHeight;
     update2DMap();
 }
 
@@ -253,8 +265,10 @@ function updateCameraPosition() {
 }
 
 function update2DMap() {
-    const cellWidth = mapCanvas.width / MAZE_WIDTH;
-    const cellHeight = mapCanvas.height / MAZE_HEIGHT;
+    const cellSize = Math.min(mapCanvas.width / MAZE_WIDTH, mapCanvas.height / MAZE_HEIGHT);
+    const offsetX = (mapCanvas.width - cellSize * MAZE_WIDTH) / 2;
+    const offsetY = (mapCanvas.height - cellSize * MAZE_HEIGHT) / 2;
+    
     mapCtx.fillStyle = 'black';
     mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
 
@@ -280,35 +294,62 @@ function update2DMap() {
         for (let x = 0; x < MAZE_WIDTH; x++) {
             if (discoveredMaze[y][x] === 0) {
                 mapCtx.fillStyle = 'white';
-                mapCtx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+                mapCtx.fillRect(offsetX + x * cellSize, offsetY + y * cellSize, cellSize, cellSize);
             } else if (discoveredMaze[y][x] === 1) {
                 mapCtx.fillStyle = '#555';
-                mapCtx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+                mapCtx.fillRect(offsetX + x * cellSize, offsetY + y * cellSize, cellSize, cellSize);
                 mapCtx.strokeStyle = '#444';
-                mapCtx.strokeRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+                mapCtx.strokeRect(offsetX + x * cellSize, offsetY + y * cellSize, cellSize, cellSize);
             }
         }
     }
 
-    mapCtx.font = `bold ${cellHeight * 1.2}px sans-serif`;
+    mapCtx.font = `bold ${cellSize * 1.2}px sans-serif`;
     mapCtx.textAlign = 'center';
     mapCtx.textBaseline = 'middle';
     mapCtx.fillStyle = '#33aaff';
-    mapCtx.fillText('S', 1.5 * cellWidth, 1.5 * cellHeight);
+    mapCtx.fillText('S', offsetX + 1.5 * cellSize, offsetY + 1.5 * cellSize);
     mapCtx.fillStyle = '#ff33aa';
-    mapCtx.fillText('G', (MAZE_WIDTH - 1.5) * cellWidth, (MAZE_HEIGHT - 1.5) * cellHeight);
+    mapCtx.fillText('G', offsetX + (MAZE_WIDTH - 1.5) * cellSize, offsetY + (MAZE_HEIGHT - 1.5) * cellSize);
 
     mapCtx.fillStyle = 'red';
     mapCtx.save();
-    mapCtx.translate(playerX * cellWidth + cellWidth / 2, playerY * cellHeight + cellHeight / 2);
+    mapCtx.translate(offsetX + playerX * cellSize + cellSize / 2, offsetY + playerY * cellSize + cellSize / 2);
     mapCtx.rotate(playerRotation * Math.PI / 2);
     mapCtx.beginPath();
-    mapCtx.moveTo(0, -cellHeight / 3);
-    mapCtx.lineTo(-cellWidth / 4, cellHeight / 3);
-    mapCtx.lineTo(cellWidth / 4, cellHeight / 3);
+    mapCtx.moveTo(0, -cellSize / 3);
+    mapCtx.lineTo(-cellSize / 4, cellSize / 3);
+    mapCtx.lineTo(cellSize / 4, cellSize / 3);
     mapCtx.closePath();
     mapCtx.fill();
     mapCtx.restore();
+    
+    updateMapStats();
+}
+
+function updateMapStats() {
+    // Update position
+    document.getElementById('position').textContent = `X: ${playerX}, Y: ${playerY}`;
+    
+    // Calculate explored percentage
+    let exploredCount = 0;
+    let totalTraversable = 0;
+    for (let y = 0; y < MAZE_HEIGHT; y++) {
+        for (let x = 0; x < MAZE_WIDTH; x++) {
+            if (maze[y][x] === 0) {
+                totalTraversable++;
+                if (discoveredMaze[y][x] !== -1) {
+                    exploredCount++;
+                }
+            }
+        }
+    }
+    const exploredPercentage = Math.round((exploredCount / totalTraversable) * 100);
+    document.getElementById('explored').textContent = `${exploredPercentage}%`;
+    
+    // Calculate distance to goal
+    const distance = Math.abs(playerX - (MAZE_WIDTH - 2)) + Math.abs(playerY - (MAZE_HEIGHT - 2));
+    document.getElementById('distance').textContent = distance;
 }
 
 function checkGemCollection() {
