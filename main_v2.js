@@ -19,6 +19,7 @@ let startTime, elapsedTime, timerInterval;
 let bestTime = localStorage.getItem('bestTime') || Infinity;
 
 let isMoving = false;
+let totalExploredCells = 0;
 
 const mapCanvas = document.getElementById('map-2d');
 const mapCtx = mapCanvas.getContext('2d');
@@ -28,7 +29,8 @@ const bestTimeDisplay = document.getElementById('best-time'); // Corrected line
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB); // Sky blue background
+    scene.background = new THREE.Color(0x1a237e); // Brighter blue background
+    scene.fog = new THREE.Fog(0x1a237e, 30, 150); // Lighter fog, starts further away
 
     camera = new THREE.PerspectiveCamera(75, (window.innerWidth * 0.6) / 600, 0.1, 1000);
 
@@ -55,16 +57,32 @@ function startGame() {
         scene.remove(scene.children[0]);
     }
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Original intensity
+    const ambientLight = new THREE.AmbientLight(0x606060, 0.6); // Brighter ambient light
     scene.add(ambientLight);
-    pointLight = new THREE.PointLight(0xffffff, 1, 50); // Original intensity
+    
+    pointLight = new THREE.PointLight(0xffffff, 1.5, 60); // White point light, wider range
     scene.add(pointLight);
+    
+    // Add a second point light for better visibility
+    const secondLight = new THREE.PointLight(0x4ecdc4, 0.8, 40);
+    scene.add(secondLight);
+    
+    // Add directional light for overall brightness
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    directionalLight.position.set(0, 20, 0);
+    scene.add(directionalLight);
 
     const floorGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE, MAZE_HEIGHT * CELL_SIZE);
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xAAAAAA, roughness: 0.8, side: THREE.DoubleSide }); // Grey floor, StandardMaterial
+    const floorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x2a2a3e,
+        roughness: 0.8,
+        metalness: 0.1,
+        side: THREE.DoubleSide
+    });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
     floor.position.set((MAZE_WIDTH / 2) * CELL_SIZE, 0, (MAZE_HEIGHT / 2) * CELL_SIZE);
+    floor.receiveShadow = true;
     scene.add(floor);
 
     // Ceiling object removed as per user's request to use background color for sky
@@ -73,11 +91,25 @@ function startGame() {
     drawMaze();
     placeGems();
 
-    const goalGeometry = new THREE.BoxGeometry(CELL_SIZE / 2, CELL_SIZE / 2, CELL_SIZE / 2);
-    const goalMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const goalGeometry = new THREE.BoxGeometry(CELL_SIZE * 0.8, CELL_SIZE * 0.8, CELL_SIZE * 0.8);
+    const goalMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x00ff00,
+        emissive: 0x00ff00,
+        emissiveIntensity: 0.5,
+        roughness: 0.2,
+        metalness: 0.8
+    });
     const goal = new THREE.Mesh(goalGeometry, goalMaterial);
     goal.position.set((MAZE_WIDTH - 2) * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, (MAZE_HEIGHT - 2) * CELL_SIZE + CELL_SIZE / 2);
     scene.add(goal);
+    
+    // Animate goal
+    function animateGoal() {
+        goal.rotation.y += 0.01;
+        goal.position.y = WALL_HEIGHT / 2 + Math.sin(Date.now() * 0.001) * 0.5;
+        requestAnimationFrame(animateGoal);
+    }
+    animateGoal();
 
     init2DMap();
     updateCameraPosition();
@@ -126,9 +158,15 @@ function generateMaze() {
 
 function drawMaze() {
     const wallGeometry = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
+    const wallMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x263959,
+        roughness: 0.7,
+        metalness: 0.2,
+        emissive: 0x263959,
+        emissiveIntensity: 0.05
+    });
     const edgesGeometry = new THREE.EdgesGeometry(wallGeometry);
-    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x222222 });
+    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x4ecdc4, linewidth: 2 });
 
     for (let y = 0; y < MAZE_HEIGHT; y++) {
         for (let x = 0; x < MAZE_WIDTH; x++) {
@@ -148,13 +186,15 @@ function placeGems() {
     gems = [];
     const gemGeometry = new THREE.IcosahedronGeometry(CELL_SIZE / 3, 0);
     const gemMaterial = new THREE.MeshPhysicalMaterial({
-        color: 0xff0000, // Ruby red
+        color: 0xff1744, // Bright red
+        emissive: 0xff1744,
+        emissiveIntensity: 0.2,
         transparent: true,
         opacity: 0.9,
         roughness: 0.1,
-        metalness: 0.3,
-        transmission: 0.8,
-        clearcoat: 1.0
+        metalness: 0.8,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1
     });
 
     for (let i = 0; i < NUM_GEMS; i++) {
@@ -173,16 +213,39 @@ function placeGems() {
 }
 
 function init2DMap() {
+    const mapContainer = mapCanvas.parentElement;
+    const computedStyle = window.getComputedStyle(mapContainer);
+    const containerHeight = mapContainer.clientHeight - 
+                          parseInt(computedStyle.paddingTop) - 
+                          parseInt(computedStyle.paddingBottom);
+    
+    // Calculate available height for canvas
+    const headerHeight = document.getElementById('map-header').offsetHeight;
+    const statsHeight = document.getElementById('map-stats').offsetHeight;
+    const availableHeight = containerHeight - headerHeight - statsHeight;
+    
     mapCanvas.width = mapCanvas.offsetWidth;
-    mapCanvas.height = mapCanvas.offsetHeight;
+    mapCanvas.height = availableHeight;
     update2DMap();
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    gems.forEach(gem => {
+    const time = Date.now() * 0.001;
+    
+    gems.forEach((gem, index) => {
         gem.rotation.y += 0.02;
+        gem.rotation.x += 0.01;
+        gem.position.y = WALL_HEIGHT / 2 + Math.sin(time * 2 + index) * 0.3;
     });
+    
+    // Update second light position
+    const secondLight = scene.children.find(child => child.type === 'PointLight' && child.color.getHex() === 0x4ecdc4);
+    if (secondLight) {
+        secondLight.position.copy(camera.position);
+        secondLight.position.y += 2;
+    }
+    
     renderer.render(scene, camera);
 }
 
@@ -253,8 +316,10 @@ function updateCameraPosition() {
 }
 
 function update2DMap() {
-    const cellWidth = mapCanvas.width / MAZE_WIDTH;
-    const cellHeight = mapCanvas.height / MAZE_HEIGHT;
+    const cellSize = Math.min(mapCanvas.width / MAZE_WIDTH, mapCanvas.height / MAZE_HEIGHT);
+    const offsetX = (mapCanvas.width - cellSize * MAZE_WIDTH) / 2;
+    const offsetY = (mapCanvas.height - cellSize * MAZE_HEIGHT) / 2;
+    
     mapCtx.fillStyle = 'black';
     mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
 
@@ -280,35 +345,62 @@ function update2DMap() {
         for (let x = 0; x < MAZE_WIDTH; x++) {
             if (discoveredMaze[y][x] === 0) {
                 mapCtx.fillStyle = 'white';
-                mapCtx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+                mapCtx.fillRect(offsetX + x * cellSize, offsetY + y * cellSize, cellSize, cellSize);
             } else if (discoveredMaze[y][x] === 1) {
                 mapCtx.fillStyle = '#555';
-                mapCtx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+                mapCtx.fillRect(offsetX + x * cellSize, offsetY + y * cellSize, cellSize, cellSize);
                 mapCtx.strokeStyle = '#444';
-                mapCtx.strokeRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+                mapCtx.strokeRect(offsetX + x * cellSize, offsetY + y * cellSize, cellSize, cellSize);
             }
         }
     }
 
-    mapCtx.font = `bold ${cellHeight * 1.2}px sans-serif`;
+    mapCtx.font = `bold ${cellSize * 1.2}px sans-serif`;
     mapCtx.textAlign = 'center';
     mapCtx.textBaseline = 'middle';
     mapCtx.fillStyle = '#33aaff';
-    mapCtx.fillText('S', 1.5 * cellWidth, 1.5 * cellHeight);
+    mapCtx.fillText('S', offsetX + 1.5 * cellSize, offsetY + 1.5 * cellSize);
     mapCtx.fillStyle = '#ff33aa';
-    mapCtx.fillText('G', (MAZE_WIDTH - 1.5) * cellWidth, (MAZE_HEIGHT - 1.5) * cellHeight);
+    mapCtx.fillText('G', offsetX + (MAZE_WIDTH - 1.5) * cellSize, offsetY + (MAZE_HEIGHT - 1.5) * cellSize);
 
     mapCtx.fillStyle = 'red';
     mapCtx.save();
-    mapCtx.translate(playerX * cellWidth + cellWidth / 2, playerY * cellHeight + cellHeight / 2);
+    mapCtx.translate(offsetX + playerX * cellSize + cellSize / 2, offsetY + playerY * cellSize + cellSize / 2);
     mapCtx.rotate(playerRotation * Math.PI / 2);
     mapCtx.beginPath();
-    mapCtx.moveTo(0, -cellHeight / 3);
-    mapCtx.lineTo(-cellWidth / 4, cellHeight / 3);
-    mapCtx.lineTo(cellWidth / 4, cellHeight / 3);
+    mapCtx.moveTo(0, -cellSize / 3);
+    mapCtx.lineTo(-cellSize / 4, cellSize / 3);
+    mapCtx.lineTo(cellSize / 4, cellSize / 3);
     mapCtx.closePath();
     mapCtx.fill();
     mapCtx.restore();
+    
+    updateMapStats();
+}
+
+function updateMapStats() {
+    // Update position
+    document.getElementById('position').textContent = `X: ${playerX}, Y: ${playerY}`;
+    
+    // Calculate explored percentage
+    let exploredCount = 0;
+    let totalTraversable = 0;
+    for (let y = 0; y < MAZE_HEIGHT; y++) {
+        for (let x = 0; x < MAZE_WIDTH; x++) {
+            if (maze[y][x] === 0) {
+                totalTraversable++;
+                if (discoveredMaze[y][x] !== -1) {
+                    exploredCount++;
+                }
+            }
+        }
+    }
+    const exploredPercentage = Math.round((exploredCount / totalTraversable) * 100);
+    document.getElementById('explored').textContent = `${exploredPercentage}%`;
+    
+    // Calculate distance to goal
+    const distance = Math.abs(playerX - (MAZE_WIDTH - 2)) + Math.abs(playerY - (MAZE_HEIGHT - 2));
+    document.getElementById('distance').textContent = distance;
 }
 
 function checkGemCollection() {
@@ -323,7 +415,7 @@ function checkGemCollection() {
 }
 
 function updateGemCounter() {
-    gemCounter.textContent = `Gems: ${collectedGems}/${NUM_GEMS}`;
+    gemCounter.innerHTML = `💎 Gems: ${collectedGems}/${NUM_GEMS}`;
 }
 
 function checkGoal() {
@@ -362,7 +454,7 @@ function startTimer() {
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
         elapsedTime = Date.now() - startTime;
-        timerDisplay.textContent = `Time: ${formatTime(elapsedTime)}`;
+        timerDisplay.innerHTML = `⏱️ Time: ${formatTime(elapsedTime)}`;
     }, 1000);
 }
 
@@ -378,7 +470,7 @@ function formatTime(ms) {
 }
 
 function updateBestTimeDisplay() {
-    bestTimeDisplay.textContent = `Best: ${formatTime(bestTime)}`;
+    bestTimeDisplay.innerHTML = `🏆 Best: ${formatTime(bestTime)}`;
 }
 
 init();
