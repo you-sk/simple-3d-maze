@@ -29,7 +29,8 @@ const bestTimeDisplay = document.getElementById('best-time'); // Corrected line
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB); // Sky blue background
+    scene.background = new THREE.Color(0x1a237e); // Brighter blue background
+    scene.fog = new THREE.Fog(0x1a237e, 30, 150); // Lighter fog, starts further away
 
     camera = new THREE.PerspectiveCamera(75, (window.innerWidth * 0.6) / 600, 0.1, 1000);
 
@@ -56,16 +57,32 @@ function startGame() {
         scene.remove(scene.children[0]);
     }
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Original intensity
+    const ambientLight = new THREE.AmbientLight(0x606060, 0.6); // Brighter ambient light
     scene.add(ambientLight);
-    pointLight = new THREE.PointLight(0xffffff, 1, 50); // Original intensity
+    
+    pointLight = new THREE.PointLight(0xffffff, 1.5, 60); // White point light, wider range
     scene.add(pointLight);
+    
+    // Add a second point light for better visibility
+    const secondLight = new THREE.PointLight(0x4ecdc4, 0.8, 40);
+    scene.add(secondLight);
+    
+    // Add directional light for overall brightness
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    directionalLight.position.set(0, 20, 0);
+    scene.add(directionalLight);
 
     const floorGeometry = new THREE.PlaneGeometry(MAZE_WIDTH * CELL_SIZE, MAZE_HEIGHT * CELL_SIZE);
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xAAAAAA, roughness: 0.8, side: THREE.DoubleSide }); // Grey floor, StandardMaterial
+    const floorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x2a2a3e,
+        roughness: 0.8,
+        metalness: 0.1,
+        side: THREE.DoubleSide
+    });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
     floor.position.set((MAZE_WIDTH / 2) * CELL_SIZE, 0, (MAZE_HEIGHT / 2) * CELL_SIZE);
+    floor.receiveShadow = true;
     scene.add(floor);
 
     // Ceiling object removed as per user's request to use background color for sky
@@ -74,11 +91,25 @@ function startGame() {
     drawMaze();
     placeGems();
 
-    const goalGeometry = new THREE.BoxGeometry(CELL_SIZE / 2, CELL_SIZE / 2, CELL_SIZE / 2);
-    const goalMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const goalGeometry = new THREE.BoxGeometry(CELL_SIZE * 0.8, CELL_SIZE * 0.8, CELL_SIZE * 0.8);
+    const goalMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x00ff00,
+        emissive: 0x00ff00,
+        emissiveIntensity: 0.5,
+        roughness: 0.2,
+        metalness: 0.8
+    });
     const goal = new THREE.Mesh(goalGeometry, goalMaterial);
     goal.position.set((MAZE_WIDTH - 2) * CELL_SIZE + CELL_SIZE / 2, WALL_HEIGHT / 2, (MAZE_HEIGHT - 2) * CELL_SIZE + CELL_SIZE / 2);
     scene.add(goal);
+    
+    // Animate goal
+    function animateGoal() {
+        goal.rotation.y += 0.01;
+        goal.position.y = WALL_HEIGHT / 2 + Math.sin(Date.now() * 0.001) * 0.5;
+        requestAnimationFrame(animateGoal);
+    }
+    animateGoal();
 
     init2DMap();
     updateCameraPosition();
@@ -127,9 +158,15 @@ function generateMaze() {
 
 function drawMaze() {
     const wallGeometry = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
+    const wallMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x263959,
+        roughness: 0.7,
+        metalness: 0.2,
+        emissive: 0x263959,
+        emissiveIntensity: 0.05
+    });
     const edgesGeometry = new THREE.EdgesGeometry(wallGeometry);
-    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x222222 });
+    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x4ecdc4, linewidth: 2 });
 
     for (let y = 0; y < MAZE_HEIGHT; y++) {
         for (let x = 0; x < MAZE_WIDTH; x++) {
@@ -149,13 +186,15 @@ function placeGems() {
     gems = [];
     const gemGeometry = new THREE.IcosahedronGeometry(CELL_SIZE / 3, 0);
     const gemMaterial = new THREE.MeshPhysicalMaterial({
-        color: 0xff0000, // Ruby red
+        color: 0xff1744, // Bright red
+        emissive: 0xff1744,
+        emissiveIntensity: 0.2,
         transparent: true,
         opacity: 0.9,
         roughness: 0.1,
-        metalness: 0.3,
-        transmission: 0.8,
-        clearcoat: 1.0
+        metalness: 0.8,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1
     });
 
     for (let i = 0; i < NUM_GEMS; i++) {
@@ -192,9 +231,21 @@ function init2DMap() {
 
 function animate() {
     requestAnimationFrame(animate);
-    gems.forEach(gem => {
+    const time = Date.now() * 0.001;
+    
+    gems.forEach((gem, index) => {
         gem.rotation.y += 0.02;
+        gem.rotation.x += 0.01;
+        gem.position.y = WALL_HEIGHT / 2 + Math.sin(time * 2 + index) * 0.3;
     });
+    
+    // Update second light position
+    const secondLight = scene.children.find(child => child.type === 'PointLight' && child.color.getHex() === 0x4ecdc4);
+    if (secondLight) {
+        secondLight.position.copy(camera.position);
+        secondLight.position.y += 2;
+    }
+    
     renderer.render(scene, camera);
 }
 
@@ -364,7 +415,7 @@ function checkGemCollection() {
 }
 
 function updateGemCounter() {
-    gemCounter.textContent = `Gems: ${collectedGems}/${NUM_GEMS}`;
+    gemCounter.innerHTML = `💎 Gems: ${collectedGems}/${NUM_GEMS}`;
 }
 
 function checkGoal() {
@@ -403,7 +454,7 @@ function startTimer() {
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
         elapsedTime = Date.now() - startTime;
-        timerDisplay.textContent = `Time: ${formatTime(elapsedTime)}`;
+        timerDisplay.innerHTML = `⏱️ Time: ${formatTime(elapsedTime)}`;
     }, 1000);
 }
 
@@ -419,7 +470,7 @@ function formatTime(ms) {
 }
 
 function updateBestTimeDisplay() {
-    bestTimeDisplay.textContent = `Best: ${formatTime(bestTime)}`;
+    bestTimeDisplay.innerHTML = `🏆 Best: ${formatTime(bestTime)}`;
 }
 
 init();
