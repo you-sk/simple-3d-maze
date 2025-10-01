@@ -1,8 +1,28 @@
-const MAZE_WIDTH = 31;
-const MAZE_HEIGHT = 21;
+let MAZE_WIDTH = 31;
+let MAZE_HEIGHT = 21;
 const WALL_HEIGHT = 5;
 const CELL_SIZE = 10;
-const NUM_GEMS = 3;
+let NUM_GEMS = 3;
+
+const DIFFICULTY_SETTINGS = {
+    easy: {
+        width: 15,
+        height: 11,
+        gems: 2
+    },
+    normal: {
+        width: 31,
+        height: 21,
+        gems: 3
+    },
+    hard: {
+        width: 51,
+        height: 31,
+        gems: 5
+    }
+};
+
+let currentDifficulty = 'normal';
 
 let scene, camera, renderer;
 let maze = [];
@@ -16,7 +36,11 @@ let playerRotation = 0;
 
 let collectedGems = 0;
 let startTime, elapsedTime, timerInterval;
-let bestTime = localStorage.getItem('bestTime') || Infinity;
+let bestTimes = {
+    easy: localStorage.getItem('bestTime-easy') ? parseFloat(localStorage.getItem('bestTime-easy')) : Infinity,
+    normal: localStorage.getItem('bestTime-normal') ? parseFloat(localStorage.getItem('bestTime-normal')) : Infinity,
+    hard: localStorage.getItem('bestTime-hard') ? parseFloat(localStorage.getItem('bestTime-hard')) : Infinity
+};
 
 let isMoving = false;
 let totalExploredCells = 0;
@@ -38,11 +62,19 @@ function init() {
     renderer.setSize(window.innerWidth * 0.6, 600);
     document.getElementById('view-3d').appendChild(renderer.domElement);
 
-    document.getElementById('restart-button').addEventListener('click', restartGame);
+    document.getElementById('restart-button').addEventListener('click', showDifficultySelection);
     document.addEventListener('keydown', handleKeyDown);
 
+    // Setup difficulty selection buttons
+    const difficultyButtons = document.querySelectorAll('.difficulty-button');
+    difficultyButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const difficulty = button.getAttribute('data-difficulty');
+            selectDifficulty(difficulty);
+        });
+    });
+
     updateBestTimeDisplay();
-    startGame();
     animate();
 }
 
@@ -422,10 +454,11 @@ function checkGoal() {
     if (playerX === MAZE_WIDTH - 2 && playerY === MAZE_HEIGHT - 2) {
         if (collectedGems === NUM_GEMS) {
             stopTimer();
-            const newBestTime = elapsedTime < bestTime;
+            const currentBestTime = bestTimes[currentDifficulty];
+            const newBestTime = elapsedTime < currentBestTime;
             if (newBestTime) {
-                bestTime = elapsedTime;
-                localStorage.setItem('bestTime', bestTime);
+                bestTimes[currentDifficulty] = elapsedTime;
+                localStorage.setItem(`bestTime-${currentDifficulty}`, elapsedTime);
                 updateBestTimeDisplay();
             }
             showGoalModal(newBestTime);
@@ -438,10 +471,26 @@ function showGoalModal(isNewRecord) {
     const modalTime = document.getElementById('modal-time');
     const modalBestTime = document.getElementById('modal-best-time');
 
-    modalTitle.textContent = isNewRecord ? "New Record!" : "Goal!";
+    modalTitle.textContent = isNewRecord ? "🏆 New Record!" : "🎉 Goal!";
     modalTime.textContent = `Time: ${formatTime(elapsedTime)}`;
-    modalBestTime.textContent = `Best: ${formatTime(bestTime)}`;
+    modalBestTime.textContent = `Best (${currentDifficulty.toUpperCase()}): ${formatTime(bestTimes[currentDifficulty])}`;
     document.getElementById('goal-modal').style.display = 'block';
+}
+
+function selectDifficulty(difficulty) {
+    currentDifficulty = difficulty;
+    const settings = DIFFICULTY_SETTINGS[difficulty];
+    MAZE_WIDTH = settings.width;
+    MAZE_HEIGHT = settings.height;
+    NUM_GEMS = settings.gems;
+
+    document.getElementById('difficulty-modal').style.display = 'none';
+    startGame();
+}
+
+function showDifficultySelection() {
+    document.getElementById('goal-modal').style.display = 'none';
+    document.getElementById('difficulty-modal').style.display = 'block';
 }
 
 function restartGame() {
@@ -470,7 +519,7 @@ function formatTime(ms) {
 }
 
 function updateBestTimeDisplay() {
-    bestTimeDisplay.innerHTML = `🏆 Best: ${formatTime(bestTime)}`;
+    bestTimeDisplay.innerHTML = `🏆 Best: ${formatTime(bestTimes[currentDifficulty])}`;
 }
 
 init();
